@@ -24,9 +24,12 @@ import (
 var app *simapp.SimApp
 var ctx sdk.Context
 var defaultRecipient sdk.AccAddress
-var accounts map[string]sdk.AccAddress
+var accountNameToAddress map[string]sdk.AccAddress
 var validators map[string]sdk.ValAddress
 var PKs []types.PubKey
+
+var modelMsgToCosmosURL map[string]string
+var cosmosURLToModelMsg map[string]string
 
 const GRANT_SUCCESS string = "grant_success"
 const GRANT_FAILED string = "grant_failed"
@@ -92,14 +95,33 @@ type ActionModel struct {
 	GrantPayload GrantPayloadModel `json:"grant_payload"`
 }
 
+type ActiveGrantsModel struct {
+	Grantee            string   `json:"grantee,omitempty"`
+	Granter            string   `json:"granter,omitempty"`
+	SdkMessageType     string   `json:"sdk_message_type,omitempty"`
+	AllowList          SetModel `json:"allow_list,omitempty"`
+	AuthorizationLogic string   `json:"authorization_logic,omitempty"`
+	DenyList           SetModel `json:"deny_list,omitempty"`
+	Limit              int64    `json:"limit,omitempty"`
+	SpecialValue       string   `json:"special_value,omitempty"`
+}
+
+type SetModel struct {
+	Set []GrantModel `json:"#set"`
+}
+
+type ActiveGrantsMapModel struct {
+	ActiveGrants [][]ActiveGrantsModel `json:"#map"`
+}
+
 type StateModel struct {
-	Meta          interface{} `json:"#meta"`
-	ActionTaken   ActionModel `json:"action_taken"`
-	ActiveGrants  interface{} `json:"active_grants"`
-	ExpiredGrants interface{} `json:"expired_grants"`
-	NumExecs      int         `json:"num_execs"`
-	NumGrants     int         `json:"num_grants"`
-	OutcomeStatus string      `json:"outcome_status"`
+	Meta            interface{}          `json:"#meta"`
+	ActionTaken     ActionModel          `json:"action_taken"`
+	ActiveGrantsMap ActiveGrantsMapModel `json:"active_grants"`
+	ExpiredGrants   SetModel             `json:"expired_grants"`
+	NumExecs        int                  `json:"num_execs"`
+	NumGrants       int                  `json:"num_grants"`
+	OutcomeStatus   string               `json:"outcome_status"`
 }
 
 type MainJsonStruct struct {
@@ -117,23 +139,7 @@ func getValAddrList(names []string) []sdk.ValAddress {
 	return addrList
 }
 
-func genericMsgTlaToCosmosURL(msg_type string) (string, error) {
-
-	switch msg_type {
-	case string(MsgDelegate):
-		return sdk.MsgTypeURL(&stakingtypes.MsgDelegate{}), nil
-	case string(MsgUndelegate):
-		return sdk.MsgTypeURL(&stakingtypes.MsgUndelegate{}), nil
-	case string(MsgRedelegate):
-		return sdk.MsgTypeURL(&stakingtypes.MsgBeginRedelegate{}), nil
-	case string(MsgSend):
-		return sdk.MsgTypeURL(&banktypes.MsgSend{}), nil
-	case string(MsgOther):
-		return sdk.MsgTypeURL(&govtypes.MsgVote{}), nil
-	default:
-		return "", fmt.Errorf("invalid message")
-	}
-}
+//func cosmosUrlToModelMsg(msg_type )
 
 func giveSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
 	grantPayload := actionTaken.GrantPayload
@@ -173,24 +179,19 @@ func giveSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
 				limitAddr)
 			// IG: is there a benefit in adding these low-level checks?
 			require.NoError(t, err)
-			authorizationMsgTypeURL, err := genericMsgTlaToCosmosURL(actionTaken.Grant.SdkMessageType)
-			require.NoError(t, err)
+			authorizationMsgTypeURL := modelMsgToCosmosURL[actionTaken.Grant.SdkMessageType]
 			require.Equal(t, authorization.MsgTypeURL(), authorizationMsgTypeURL)
 
 		}
 	case "send":
 		{
-
-			var limit sdk.Coins
-			limit = sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(int64(grantPayload.Limit))))
+			limit := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(int64(grantPayload.Limit))))
 			authorization = banktypes.NewSendAuthorization(limit)
-
 		}
 	case "generic":
 		{
 
-			msg_url, err := genericMsgTlaToCosmosURL(actionTaken.Grant.SdkMessageType)
-			require.NoError(t, err)
+			msg_url := modelMsgToCosmosURL[actionTaken.Grant.SdkMessageType]
 			authorization = authz.NewGenericAuthorization(msg_url)
 		}
 	default:
@@ -199,8 +200,8 @@ func giveSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
 	}
 	require.NoError(t, authorization.ValidateBasic())
 
-	granterAddr := accounts[actionTaken.Grant.Granter]
-	granteeAddr := accounts[actionTaken.Grant.Grantee]
+	granterAddr := accountNameToAddress[actionTaken.Grant.Granter]
+	granteeAddr := accountNameToAddress[actionTaken.Grant.Grantee]
 	now := ctx.BlockHeader().Time
 	err := app.AuthzKeeper.SaveGrant(ctx, granteeAddr, granterAddr, authorization, now.Add(time.Hour))
 	require.NoError(t, err)
@@ -220,11 +221,11 @@ func giveSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
 }
 
 func revokeSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
-	granterAddr := accounts[actionTaken.Grant.Granter]
-	granteeAddr := accounts[actionTaken.Grant.Grantee]
-	authorizationType, err := genericMsgTlaToCosmosURL(actionTaken.Grant.SdkMessageType)
-	require.NoError(t, err)
-	err = app.AuthzKeeper.DeleteGrant(ctx, granteeAddr, granterAddr, authorizationType)
+	granterAddr := accountNameToAddress[actionTaken.Grant.Granter]
+	granteeAddr := accountNameToAddress[actionTaken.Grant.Grantee]
+	authorizationType := modelMsgToCosmosURL[actionTaken.Grant.SdkMessageType]
+
+	err := app.AuthzKeeper.DeleteGrant(ctx, granteeAddr, granterAddr, authorizationType)
 	require.NoError(t, err)
 
 	authorization, _ := app.AuthzKeeper.GetCleanAuthorization(ctx, granteeAddr, granterAddr, authorizationType)
@@ -240,20 +241,20 @@ func revokeSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T)
 
 func expireSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
 	granterAddr := sdk.AccAddress(actionTaken.Grant.Granter)
-	granteeAddr := accounts[actionTaken.Grant.Grantee]
-	authorizationType, err := genericMsgTlaToCosmosURL(actionTaken.Grant.SdkMessageType)
-	require.NoError(t, err)
+	granteeAddr := accountNameToAddress[actionTaken.Grant.Grantee]
+	authorizationType := modelMsgToCosmosURL[actionTaken.Grant.SdkMessageType]
+
 	authorization, _ := app.AuthzKeeper.GetCleanAuthorization(ctx, granteeAddr, granterAddr, authorizationType)
 	now := ctx.BlockHeader().Time
 	// expiring a grant is done by updating the previous authorization by a new one that is in the past
-	err = app.AuthzKeeper.SaveGrant(ctx, granteeAddr, granterAddr, authorization, now.Add(-1*time.Hour))
+	err := app.AuthzKeeper.SaveGrant(ctx, granteeAddr, granterAddr, authorization, now.Add(-1*time.Hour))
 	require.NoError(t, err)
 
 }
 
 func executeSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
-	granteeAddr := accounts[actionTaken.Grant.Grantee]
-	granterAddr := accounts[actionTaken.Grant.Granter]
+	granteeAddr := accountNameToAddress[actionTaken.Grant.Grantee]
+	granterAddr := accountNameToAddress[actionTaken.Grant.Granter]
 	// var msgs authz.MsgExec
 	var messages []sdk.Msg
 
@@ -326,18 +327,20 @@ func executeAppropriateAction(state StateModel, t *testing.T) {
 
 }
 
-func TestExecuteItfJson(t *testing.T) {
+func testEnvironmentSetup(t *testing.T) {
 	app = simapp.Setup(t, false)
 	ctx = app.BaseApp.NewContext(false, tmproto.Header{})
-
 	PKs = simapp.CreateTestPubKeys(5)
-	accounts = make(map[string]sdk.AccAddress)
-	accountsAddresses := simapp.AddTestAddrs(app, ctx, 4, sdk.NewInt(1000))
-	accounts["A"] = accountsAddresses[0]
-	accounts["B"] = accountsAddresses[1]
-	accounts["C"] = accountsAddresses[2]
-	accounts["default_recipient"] = accountsAddresses[3]
 
+	// connects to the accounts' names from the model
+	accountNameToAddress = make(map[string]sdk.AccAddress)
+	accountsAddresses := simapp.AddTestAddrs(app, ctx, 4, sdk.NewInt(1000))
+	accountNameToAddress["A"] = accountsAddresses[0]
+	accountNameToAddress["B"] = accountsAddresses[1]
+	accountNameToAddress["C"] = accountsAddresses[2]
+	accountNameToAddress["default_recipient"] = accountsAddresses[3]
+
+	// c onnects to the validators' names from the model
 	validators = make(map[string]sdk.ValAddress)
 	validatorAddresses := simapp.ConvertAddrsToValAddrs(simapp.AddTestAddrs(app, ctx, 3, sdk.NewInt(1000)))
 	validators["X"] = validatorAddresses[0]
@@ -348,12 +351,64 @@ func TestExecuteItfJson(t *testing.T) {
 		tstaking.CreateValidator(valAddr, PKs[i], sdk.NewInt(10), true)
 	}
 
+	// make so that each account delegates with each of the validators.
+	// We do so because the model only cares about whether a certain message has an authorization
+	// (for instance, we want to be able to undelegate from state 0)
 	for _, accAddr := range accountsAddresses {
 		for _, valAddr := range validatorAddresses {
 			tstaking.Delegate(accAddr, valAddr, sdk.NewInt(50))
 		}
 	}
 
+	modelMsgToCosmosURL = map[string]string{
+
+		string(MsgDelegate):   sdk.MsgTypeURL(&stakingtypes.MsgDelegate{}),
+		string(MsgUndelegate): sdk.MsgTypeURL(&stakingtypes.MsgUndelegate{}),
+		string(MsgRedelegate): sdk.MsgTypeURL(&stakingtypes.MsgBeginRedelegate{}),
+		string(MsgSend):       sdk.MsgTypeURL(&banktypes.MsgSend{}),
+		string(MsgOther):      sdk.MsgTypeURL(&govtypes.MsgVote{}),
+	}
+
+	cosmosURLToModelMsg = make(map[string]string)
+
+	for k, v := range modelMsgToCosmosURL {
+		cosmosURLToModelMsg[v] = k
+	}
+
+}
+
+func containsGrant(expired []GrantModel, g ActiveGrantsModel) bool {
+	for _, expGrant := range expired {
+		if expGrant.Granter == g.Granter && expGrant.Grantee == g.Grantee && expGrant.SdkMessageType == g.SdkMessageType {
+			return true
+		}
+	}
+	return false
+}
+
+// func (keeper.Keeper).GetCleanAuthorization(ctx sdk.Context, grantee sdk.AccAddress, granter sdk.AccAddress,
+// 	msgType string) (cap authz.Authorization, expiration time.Time)
+func checkState(state StateModel, t *testing.T) {
+	activeGrantsMap := state.ActiveGrantsMap.ActiveGrants
+	expiredGrants := state.ExpiredGrants.Set
+
+	// checking that all grants present in activeGrantsMap exist inside the authz.keeper
+	for _, grantPair := range activeGrantsMap {
+		grant := grantPair[0]
+		// grantPayload := grantPair[1]
+		authorizationMsgTypeURL := modelMsgToCosmosURL[grant.SdkMessageType]
+		activeAuthorization, _ := app.AuthzKeeper.GetCleanAuthorization(ctx, accountNameToAddress[grant.Grantee], accountNameToAddress[grant.Granter], authorizationMsgTypeURL)
+		if containsGrant(expiredGrants, grant) {
+			require.Nil(t, activeAuthorization)
+		} else {
+			require.NotNil(t, activeAuthorization)
+		}
+
+	}
+}
+
+func TestExecuteItfJson(t *testing.T) {
+	testEnvironmentSetup(t)
 	traceFileName := "trace_example.itf.json"
 	traceFile, err := os.Open(traceFileName)
 	if err != nil {
@@ -366,10 +421,8 @@ func TestExecuteItfJson(t *testing.T) {
 	json.Unmarshal(byteValue, &jsonData)
 	for _, state := range jsonData.States {
 		executeAppropriateAction(state, t)
+		checkState(state, t)
 	}
-	// TODO: the question is: how to add validators to the context? I also want to have all the nodes
-	// have enough resources to send around
-	// TODO: in the last step, check the full state of active grants and their authorizations
 
 	require.True(t, false)
 }

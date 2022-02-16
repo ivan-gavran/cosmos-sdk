@@ -2,7 +2,7 @@
   "#meta": {
     "format": "ITF",
     "format-description": "https://apalache.informal.systems/docs/adr/015adr-trace.html",
-    "description": "Created by Apalache on Mon Feb 14 13:45:03 CET 2022"
+    "description": "Created by Apalache on Wed Feb 16 16:58:25 CET 2022"
   },
   "vars": [
     "outcome_status",
@@ -75,22 +75,22 @@
         "grant": {
           "grantee": "B",
           "granter": "A",
-          "sdk_message_type": "msg_undelegate"
+          "sdk_message_type": "msg_send"
         },
         "grant_payload": {
           "allow_list": {
             "#set": [
-              "X"
+              
             ]
           },
-          "authorization_logic": "stake",
+          "authorization_logic": "send",
           "deny_list": {
             "#set": [
               
             ]
           },
-          "limit": -1,
-          "special_value": "inf"
+          "limit": 7,
+          "special_value": ""
         }
       },
       "active_grants": {
@@ -99,22 +99,22 @@
             {
               "grantee": "B",
               "granter": "A",
-              "sdk_message_type": "msg_undelegate"
+              "sdk_message_type": "msg_send"
             },
             {
               "allow_list": {
                 "#set": [
-                  "X"
+                  
                 ]
               },
-              "authorization_logic": "stake",
+              "authorization_logic": "send",
               "deny_list": {
                 "#set": [
                   
                 ]
               },
-              "limit": -1,
-              "special_value": "inf"
+              "limit": 7,
+              "special_value": ""
             }
           ]
         ]
@@ -135,56 +135,35 @@
       "action_taken": {
         "action_type": "execute grant",
         "exec_message": {
-          "amount": 3,
-          "message_type": "msg_undelegate",
+          "amount": 7,
+          "message_type": "msg_send",
           "new_validator": "",
-          "validator": "X"
+          "validator": ""
         },
         "grant": {
           "grantee": "B",
           "granter": "A",
-          "sdk_message_type": "msg_undelegate"
+          "sdk_message_type": "msg_send"
         },
         "grant_payload": {
           "allow_list": {
             "#set": [
-              "X"
+              
             ]
           },
-          "authorization_logic": "stake",
+          "authorization_logic": "send",
           "deny_list": {
             "#set": [
               
             ]
           },
-          "limit": -1,
-          "special_value": "inf"
+          "limit": 7,
+          "special_value": ""
         }
       },
       "active_grants": {
         "#map": [
-          [
-            {
-              "grantee": "B",
-              "granter": "A",
-              "sdk_message_type": "msg_undelegate"
-            },
-            {
-              "allow_list": {
-                "#set": [
-                  "X"
-                ]
-              },
-              "authorization_logic": "stake",
-              "deny_list": {
-                "#set": [
-                  
-                ]
-              },
-              "limit": -1,
-              "special_value": "inf"
-            }
-          ]
+          
         ]
       },
       "expired_grants": {
@@ -194,7 +173,7 @@
       },
       "num_execs": 1,
       "num_grants": 1,
-      "outcome_status": "successful_auth_exec"
+      "outcome_status": "grant_spent"
     }
   ]
 }
