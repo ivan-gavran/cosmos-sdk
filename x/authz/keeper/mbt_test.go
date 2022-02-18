@@ -18,6 +18,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/staking/teststaking"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/require"
+	tmtime "github.com/tendermint/tendermint/libs/time"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 )
 
@@ -35,6 +36,14 @@ const GRANT_SUCCESS string = "grant_success"
 const GRANT_FAILED string = "grant_failed"
 const REVOKE_SUCCESS string = "revoke_success"
 const REVOKE_FAILED string = "revoke_failed"
+
+const NONEXISTENT_GRANT_EXEC string = "non_existent_auth"
+const EXPIRED_AUTH_EXEC string = "tried to execute an expired grant"
+const INSUFFICIENT_GRANT_EXEC string = "insufficient_auth_exec"
+const SUCCESSFUL_AUTH_EXEC string = "successful_auth_exec"
+const INAPPROPRIATE_AUTH_STAKE_NOT_ALLOW string = "inappropriate_auth_stake_not_allow"
+const INAPPROPRIATE_AUTH_STAKE_DENY string = "inappropriate_auth_stake_deny"
+const INAPPROPRIATE_AUTH_FOR_MESSAGE string = "message_not_supported_by_the_authorization"
 
 type ActionType string
 
@@ -88,10 +97,18 @@ type GrantModel struct {
 	SdkMessageType string `json:"sdk_message_type"`
 }
 
+type ExecOutcomeModel struct {
+	Accept      bool              `json:"accept"`
+	Delete      bool              `json:"delete"`
+	Description string            `json:"description"`
+	Updated     GrantPayloadModel `json:"updated"`
+}
+
 type ActionModel struct {
 	ActionType   string            `json:"action_type"`
 	Grant        GrantModel        `json:"grant"`
 	ExecMessage  ExecMessageModel  `json:"exec_message"`
+	ExecOutcome  ExecOutcomeModel  `json:"exec_outcome"`
 	GrantPayload GrantPayloadModel `json:"grant_payload"`
 }
 
@@ -140,9 +157,7 @@ func getValAddrList(names []string) []sdk.ValAddress {
 }
 
 //func cosmosUrlToModelMsg(msg_type )
-
-func giveSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
-	grantPayload := actionTaken.GrantPayload
+func cosmosAuthorizationFromModel(grantPayload GrantPayloadModel, msgType string, t *testing.T) authz.Authorization {
 	var authorization authz.Authorization
 
 	switch grantPayload.AuthorizationLogic {
@@ -153,7 +168,7 @@ func giveSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
 			denyList := getValAddrList(grantPayload.DenyList.Validators)
 
 			var stakingAuthorizationType stakingtypes.AuthorizationType
-			switch actionTaken.Grant.SdkMessageType {
+			switch msgType {
 			case string(MsgDelegate):
 				stakingAuthorizationType = stakingtypes.AuthorizationType_AUTHORIZATION_TYPE_DELEGATE
 			case string(MsgUndelegate):
@@ -179,7 +194,7 @@ func giveSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
 				limitAddr)
 			// IG: is there a benefit in adding these low-level checks?
 			require.NoError(t, err)
-			authorizationMsgTypeURL := modelMsgToCosmosURL[actionTaken.Grant.SdkMessageType]
+			authorizationMsgTypeURL := modelMsgToCosmosURL[msgType]
 			require.Equal(t, authorization.MsgTypeURL(), authorizationMsgTypeURL)
 
 		}
@@ -191,18 +206,28 @@ func giveSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
 	case "generic":
 		{
 
-			msg_url := modelMsgToCosmosURL[actionTaken.Grant.SdkMessageType]
+			msg_url := modelMsgToCosmosURL[msgType]
 			authorization = authz.NewGenericAuthorization(msg_url)
 		}
 	default:
 		sdkerrors.ErrInvalidType.Wrapf("modelator: Invalid type for the authorization logic")
 
 	}
+
+	return authorization
+
+}
+
+func giveSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
+	grantPayload := actionTaken.GrantPayload
+	authorization := cosmosAuthorizationFromModel(grantPayload, actionTaken.Grant.SdkMessageType, t)
+
 	require.NoError(t, authorization.ValidateBasic())
 
 	granterAddr := accountNameToAddress[actionTaken.Grant.Granter]
 	granteeAddr := accountNameToAddress[actionTaken.Grant.Grantee]
 	now := ctx.BlockHeader().Time
+	require.NotNil(t, now)
 	err := app.AuthzKeeper.SaveGrant(ctx, granteeAddr, granterAddr, authorization, now.Add(time.Hour))
 	require.NoError(t, err)
 	msgAuthorizationType := authorization.MsgTypeURL()
@@ -240,14 +265,16 @@ func revokeSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T)
 }
 
 func expireSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
-	granterAddr := sdk.AccAddress(actionTaken.Grant.Granter)
+	granterAddr := accountNameToAddress[actionTaken.Grant.Granter]
 	granteeAddr := accountNameToAddress[actionTaken.Grant.Grantee]
 	authorizationType := modelMsgToCosmosURL[actionTaken.Grant.SdkMessageType]
-
+	fmt.Println(authorizationType)
 	authorization, _ := app.AuthzKeeper.GetCleanAuthorization(ctx, granteeAddr, granterAddr, authorizationType)
+	require.NotNil(t, authorization)
 	now := ctx.BlockHeader().Time
+	require.NotNil(t, now)
 	// expiring a grant is done by updating the previous authorization by a new one that is in the past
-	err := app.AuthzKeeper.SaveGrant(ctx, granteeAddr, granterAddr, authorization, now.Add(-1*time.Hour))
+	err := app.AuthzKeeper.SaveGrant(ctx, granteeAddr, granterAddr, authorization, now)
 	require.NoError(t, err)
 
 }
@@ -255,54 +282,56 @@ func expireSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T)
 func executeSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
 	granteeAddr := accountNameToAddress[actionTaken.Grant.Grantee]
 	granterAddr := accountNameToAddress[actionTaken.Grant.Granter]
+	grantPayload := actionTaken.GrantPayload
 	// var msgs authz.MsgExec
-	var messages []sdk.Msg
+	var message sdk.Msg
+	modelMsgType := actionTaken.ExecMessage.Message_Type
+	msgTypeURL := modelMsgToCosmosURL[modelMsgType]
+
+	storedAuthz, _ := app.AuthzKeeper.GetCleanAuthorization(ctx, granteeAddr, granteeAddr, msgTypeURL)
+	if outcome == NONEXISTENT_GRANT_EXEC || outcome == EXPIRED_AUTH_EXEC {
+		require.Nil(t, storedAuthz)
+	}
+	authorization := cosmosAuthorizationFromModel(grantPayload, actionTaken.Grant.SdkMessageType, t)
 
 	switch actionTaken.ExecMessage.Message_Type {
 
 	case string(MsgSend):
 		amount := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(int64(actionTaken.ExecMessage.Amount))))
-		messages = []sdk.Msg{
-			banktypes.NewMsgSend(granteeAddr, defaultRecipient, amount),
-		}
+		message = banktypes.NewMsgSend(granteeAddr, defaultRecipient, amount)
 
 	case string(MsgDelegate):
 		amount := sdk.NewInt64Coin(sdk.DefaultBondDenom, int64(actionTaken.ExecMessage.Amount))
 		valAddress := validators[actionTaken.ExecMessage.Validator]
-		messages = []sdk.Msg{
-			stakingtypes.NewMsgDelegate(granterAddr, valAddress, amount),
-		}
+		message = stakingtypes.NewMsgDelegate(granterAddr, valAddress, amount)
 
 	case string(MsgUndelegate):
 		amount := sdk.NewInt64Coin(sdk.DefaultBondDenom, int64(actionTaken.ExecMessage.Amount))
 		valAddress := validators[actionTaken.ExecMessage.Validator]
-		messages = []sdk.Msg{
-			stakingtypes.NewMsgUndelegate(granterAddr, valAddress, amount),
-		}
+		message = stakingtypes.NewMsgUndelegate(granterAddr, valAddress, amount)
 
 	case string(MsgRedelegate):
 		amount := sdk.NewInt64Coin(sdk.DefaultBondDenom, int64(actionTaken.ExecMessage.Amount))
 		valAddress := validators[actionTaken.ExecMessage.Validator]
 		newValAddress := validators[actionTaken.ExecMessage.NewValidator]
-		messages = []sdk.Msg{
-			stakingtypes.NewMsgBeginRedelegate(granterAddr, valAddress, newValAddress, amount),
-		}
+		message = stakingtypes.NewMsgBeginRedelegate(granterAddr, valAddress, newValAddress, amount)
 
 	default:
 		sdkerrors.ErrInvalidType.Wrapf("modelator: Invalid message type")
 	}
 
-	exec_message := authz.NewMsgExec(granteeAddr, messages)
-	executeMsgs, err := exec_message.GetMessages()
-	require.NoError(t, err)
-	result, err := app.AuthzKeeper.DispatchActions(ctx, granteeAddr, executeMsgs)
+	if storedAuthz != nil {
+		require.Equal(t, authorization, storedAuthz)
 
-	if outcome == "successful_auth_exec" {
-		require.NoError(t, err)
-		require.NotNil(t, result)
-	} else {
-		require.Nil(t, result)
 	}
+	resp, err := authorization.Accept(ctx, message)
+	require.NoError(t, err)
+	require.Equal(t, actionTaken.ExecOutcome.Accept, resp.Accept)
+	require.Equal(t, actionTaken.ExecOutcome.Delete, resp.Delete)
+	require.Equal(t,
+		cosmosAuthorizationFromModel(actionTaken.ExecOutcome.Updated,
+			actionTaken.Grant.SdkMessageType, t),
+		resp.Updated)
 
 }
 
@@ -330,6 +359,8 @@ func executeAppropriateAction(state StateModel, t *testing.T) {
 func testEnvironmentSetup(t *testing.T) {
 	app = simapp.Setup(t, false)
 	ctx = app.BaseApp.NewContext(false, tmproto.Header{})
+	now := tmtime.Now()
+	ctx = ctx.WithBlockHeader(tmproto.Header{Time: now})
 	PKs = simapp.CreateTestPubKeys(5)
 
 	// connects to the accounts' names from the model
@@ -419,10 +450,13 @@ func TestExecuteItfJson(t *testing.T) {
 	byteValue, _ := ioutil.ReadAll(traceFile)
 	var jsonData MainJsonStruct
 	json.Unmarshal(byteValue, &jsonData)
-	for _, state := range jsonData.States {
-		executeAppropriateAction(state, t)
-		checkState(state, t)
-	}
+	// for _, state := range jsonData.States {
+	// 	executeAppropriateAction(state, t)
+	// 	checkState(state, t)
+	// }
+
+	// TODO: continue debugging. What is the role of check state? How to test multiple traces at the same time?
+	// check Dan's  code
 
 	require.True(t, false)
 }
