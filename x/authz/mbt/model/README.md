@@ -50,3 +50,23 @@ Tests:
 ## Open questions
 1. Perhaps it would be meaningful to explicitly model all failures by a special failure state (instead of forbidding those situation in the model, as it is done now). That way, more interesting behavior could be tested
 2. Some test cases also have its _complexity component_. For instance, a test may require that a grant is successfully given, but also that there are at least 3 active grants already existing. These complexity components are orthogonal to the actual tested predicate and they try to introduce a bit more interaction (which could in a real system reveal more bugs). It would be nice to figure out how to factor out those components and include them separately (currently, they are baked into predicates).
+
+
+# Generating traces
+Using a described model, we can generate traces corresponding to the described behavior using a model checker (Apalache or TLC).
+The interesting behaviors are described in the file [`authz_test.tla`](authz_test.tla). 
+
+## Using Apalache
+The Apalache model checker can be obtained [here](https://apalache.informal.systems/).
+To generate 5 traces, run
+
+`apalache check --view=CounterexamplesView --max-error=5 authz_test.tla` 
+
+Here, `apalache` is an alias for the binary of Apalache (`apalache-vX.X.X/bin/apalache-mc`). The traces (in different formats) are generated in the folder `_apalache-out/`.
+
+## Using TLC
+The TLC model checker can be obtained [here](https://lamport.azurewebsites.net/tla/standalone-tools.html?back-link=tools.html).
+To generate traces, run
+`tlc authz_test`.
+
+Here, `tlc` is an alias for `java -cp <path>/tla2tools.jar tlc2.TLC -workers auto`
