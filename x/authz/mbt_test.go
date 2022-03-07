@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -159,7 +161,7 @@ func getValAddrList(names []string) []sdk.ValAddress {
 //func cosmosUrlToModelMsg(msg_type )
 func cosmosAuthorizationFromModel(grantPayload GrantPayloadModel, msgType string, t *testing.T) authz.Authorization {
 	var authorization authz.Authorization
-	fmt.Printf("Looking for cosmos auth from payload with limit %d and msgType %s, with authorization logic %s\n", grantPayload.Limit, msgType, grantPayload.AuthorizationLogic)
+	// fmt.Printf("Looking for cosmos auth from payload with limit %d and msgType %s, with authorization logic %s\n", grantPayload.Limit, msgType, grantPayload.AuthorizationLogic)
 	switch grantPayload.AuthorizationLogic {
 	case string(Stake):
 		{
@@ -213,7 +215,7 @@ func cosmosAuthorizationFromModel(grantPayload GrantPayloadModel, msgType string
 		sdkerrors.ErrInvalidType.Wrapf("modelator: Invalid type for the authorization logic")
 
 	}
-	fmt.Printf("Returning the authorization %s\n", authorization)
+	// fmt.Printf("Returning the authorization %s\n", authorization)
 	return authorization
 
 }
@@ -233,7 +235,7 @@ func giveSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
 	msgAuthorizationType := authorization.MsgTypeURL()
 
 	storedAuthz, _ := app.AuthzKeeper.GetCleanAuthorization(ctx, granteeAddr, granterAddr, msgAuthorizationType)
-	fmt.Printf("Just stored the authorization %s, for granter %s and grantee %s\n", storedAuthz, granterAddr, granteeAddr)
+	// fmt.Printf("Just stored the authorization %s, for granter %s and grantee %s\n", storedAuthz, granterAddr, granteeAddr)
 
 	if outcome == GRANT_SUCCESS {
 		require.NotNil(t, storedAuthz)
@@ -269,7 +271,6 @@ func expireSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T)
 	granterAddr := accountNameToAddress[actionTaken.Grant.Granter]
 	granteeAddr := accountNameToAddress[actionTaken.Grant.Grantee]
 	authorizationType := modelMsgToCosmosURL[actionTaken.Grant.SdkMessageType]
-	fmt.Println(authorizationType)
 	authorization, _ := app.AuthzKeeper.GetCleanAuthorization(ctx, granteeAddr, granterAddr, authorizationType)
 	require.NotNil(t, authorization)
 	now := ctx.BlockHeader().Time
@@ -277,7 +278,8 @@ func expireSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T)
 	// expiring a grant is done by updating the previous authorization by a new one with an immediate expiration
 	err := app.AuthzKeeper.SaveGrant(ctx, granteeAddr, granterAddr, authorization, now)
 	require.NoError(t, err)
-	time.Sleep(2 * time.Second)
+	updatedTime := now.Add(time.Minute)
+	ctx = ctx.WithBlockTime(updatedTime)
 
 }
 
@@ -285,14 +287,11 @@ func executeSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T
 	granteeAddr := accountNameToAddress[actionTaken.Grant.Grantee]
 	granterAddr := accountNameToAddress[actionTaken.Grant.Granter]
 	grantPayload := actionTaken.GrantPayload
-	fmt.Println(grantPayload)
-	// var msgs authz.MsgExec
 	var message sdk.Msg
 	modelMsgType := actionTaken.ExecMessage.Message_Type
 	msgTypeURL := modelMsgToCosmosURL[modelMsgType]
 
-	storedAuthz, storedTimeout := app.AuthzKeeper.GetCleanAuthorization(ctx, granteeAddr, granterAddr, msgTypeURL)
-	fmt.Printf("timeout for authorization %s is %s\n", storedAuthz, storedTimeout)
+	storedAuthz, _ := app.AuthzKeeper.GetCleanAuthorization(ctx, granteeAddr, granterAddr, msgTypeURL)
 	if outcome == NONEXISTENT_GRANT_EXEC || outcome == EXPIRED_AUTH_EXEC {
 		require.Nil(t, storedAuthz)
 		return
@@ -328,16 +327,18 @@ func executeSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T
 	}
 
 	resp, err := authorization.Accept(ctx, message)
-	require.NoError(t, err)
-	require.Equal(t, actionTaken.ExecOutcome.Accept, resp.Accept)
-	require.Equal(t, actionTaken.ExecOutcome.Delete, resp.Delete)
-
-	updatedGrant := cosmosAuthorizationFromModel(actionTaken.ExecOutcome.Updated, actionTaken.Grant.SdkMessageType, t)
-	if grantPayload.AuthorizationLogic == string(Generic) {
-		require.Nil(t, resp.Updated)
+	if outcome == SUCCESSFUL_AUTH_EXEC {
+		require.NoError(t, err)
+		require.Equal(t, actionTaken.ExecOutcome.Accept, resp.Accept)
+		require.Equal(t, actionTaken.ExecOutcome.Delete, resp.Delete)
+		updatedGrant := cosmosAuthorizationFromModel(actionTaken.ExecOutcome.Updated, actionTaken.Grant.SdkMessageType, t)
+		if grantPayload.AuthorizationLogic == string(Generic) {
+			require.Nil(t, resp.Updated)
+		} else {
+			require.Equal(t, updatedGrant, resp.Updated)
+		}
 	} else {
-		require.Equal(t, updatedGrant, resp.Updated)
-
+		require.Error(t, err)
 	}
 
 }
@@ -415,20 +416,49 @@ func testEnvironmentSetup(t *testing.T) {
 
 }
 
+/*
+ - figure out the best way for different levels of logging in Go
+ - generate a set of tests for all possible behaviors from the model
+
+*/
 func TestExecuteItfJson(t *testing.T) {
 	testEnvironmentSetup(t)
-	traceFileName := "mbt/successfulExecution.itf.json"
-	traceFile, err := os.Open(traceFileName)
+	umbrellaDir := "mbt/generatedTraces/"
+	testDirs, err := os.ReadDir(umbrellaDir)
 	if err != nil {
-		fmt.Println(err)
-	}
-	defer traceFile.Close()
 
-	byteValue, _ := ioutil.ReadAll(traceFile)
-	var jsonData TraceJsonStruct
-	json.Unmarshal(byteValue, &jsonData)
-	for _, state := range jsonData.States {
-		executeAppropriateAction(state, t)
+		log.Fatal(err)
 	}
-	require.True(t, false)
+	// iterate over all directories corresponding to different behavior scenarios
+	for _, testDir := range testDirs {
+		currentDir := filepath.Join(umbrellaDir, testDir.Name())
+		if testDir.IsDir() {
+			testFiles, err := os.ReadDir(currentDir)
+			if err != nil {
+				log.Fatal(err)
+			}
+			// iterate over all trace-files
+			for _, testFile := range testFiles {
+				filePath := filepath.Join(currentDir, testFile.Name())
+				fmt.Printf("\n====\n Test Trace: %s\n", filePath)
+				traceFile, err := os.Open(filePath)
+				if err != nil {
+					fmt.Println(err)
+				}
+				defer traceFile.Close()
+
+				byteValue, _ := ioutil.ReadAll(traceFile)
+				var jsonData TraceJsonStruct
+				json.Unmarshal(byteValue, &jsonData)
+				for _, state := range jsonData.States {
+					executeAppropriateAction(state, t)
+				}
+				// require.True(t, false)
+				fmt.Printf("====\n")
+			}
+
+		}
+
+	}
+
 }
