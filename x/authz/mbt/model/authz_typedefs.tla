@@ -148,8 +148,9 @@ _GrantPayloadTypes(g, g_payload) ==
         /\ g_payload.deny_list = EmptySetOfStrings
         /\ g_payload.special_value = ""                
     ELSE \* , that is, IF g_payload.authorization_logic = STAKE
-        \/ (g_payload.allow_list = EmptySetOfStrings /\ g_payload.deny_list /= EmptySetOfStrings)
-        \/ (g_payload.allow_list /= EmptySetOfStrings /\ g_payload.deny_list = EmptySetOfStrings)
+        \* \/ (g_payload.allow_list = EmptySetOfStrings /\ g_payload.deny_list /= EmptySetOfStrings)
+        \* \/ (g_payload.allow_list /= EmptySetOfStrings /\ g_payload.deny_list = EmptySetOfStrings)
+        TRUE
 
     
 

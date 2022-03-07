@@ -47,22 +47,46 @@ VARIABLE
     action_taken
   
 
-            
+
+\* @type: (GRANT, GRANT_PAYLOAD) => Bool;
+_GiveGrantPrecondition(g, g_payload) ==            
+    \* must be a supported authorization
+    /\ g_payload.authorization_logic \in SUPPORTED_AUTHORIZATIONS(g.sdk_message_type)
+    \* granter and grantee must be distinct
+    /\ g.granter /= g.grantee
+    \* exactly one of (allow_list, deny_list) has to be non-empty
+    /\ (g_payload.authorization_logic = STAKE) => 
+        \/ (g_payload.allow_list = EmptySetOfStrings /\ g_payload.deny_list /= EmptySetOfStrings)
+        \/ (g_payload.allow_list /= EmptySetOfStrings /\ g_payload.deny_list = EmptySetOfStrings) 
+
         
 (*
 Create a new grant `g` with the payload `g_payload`. This is modelled by updating the function `active_grants`.
 Giving a grant fails if granter and grantee have the same address 
 (as specified at https://github.com/cosmos/cosmos-sdk/blob/75f5dd7da4/x/authz/spec/03_messages.md)
 *)
-GiveGrant(g, g_payload) ==
-    \* Because g_payload has type which is a supertype for all send, stake, and generic authorization, 
-    \* this predicate forces unused fields of g_payload to be set to default values
-    /\ _GrantPayloadTypes(g, g_payload)
-    /\ _GrantPayloadSaneValues(g_payload)
-    \* precondition: IG: it is an open question whether to change the precondition into an update which sets the 'panic' flag (to test
-    \* these kind of wrong arguments in the code)
-    /\ g_payload.authorization_logic \in SUPPORTED_AUTHORIZATIONS(g.sdk_message_type)
-    \* update
+\* @type: (GRANT, GRANT_PAYLOAD) => Bool;
+GiveGrant(g, g_payload) ==    
+    \* case-split: whether the grant succeeds or fails
+    /\  
+        \/  \* first option: grant failure
+            /\ ~ _GiveGrantPrecondition(g, g_payload)
+            /\ outcome_status' = GRANT_FAILED        
+            /\ UNCHANGED <<active_grants, expired_grants>>             
+        \/
+            /\ _GiveGrantPrecondition(g, g_payload)
+            \* Because g_payload has type which is a supertype for all send, stake, and generic authorization, 
+            \* this predicate forces unused fields of g_payload to be set to default values
+            /\ _GrantPayloadTypes(g, g_payload)
+            /\ _GrantPayloadSaneValues(g_payload)
+            \* update of state variables
+            /\ active_grants' = [k \in DOMAIN active_grants \union {g} |-> 
+                IF k = g THEN g_payload ELSE active_grants[k]]     
+            /\ outcome_status' = GRANT_SUCCESS
+            \* if there was a previously expired grant, remove it now (the fresh grant overwrites this previously expired one)
+            /\ expired_grants' = expired_grants \ {g}    
+
+    \* bookkeeping
     /\ action_taken' = [
         action_type |-> "give grant",        
         grant |-> g,        
@@ -72,24 +96,36 @@ GiveGrant(g, g_payload) ==
         exec_message |-> EmptyMessage
         ]
     /\ num_grants' = num_grants + 1
-    /\ IF g.granter /= g.grantee
-       THEN 
-            /\ active_grants' = [k \in DOMAIN active_grants \union {g} |-> 
-                IF k = g THEN g_payload ELSE active_grants[k]]     
-            /\ outcome_status' = GRANT_SUCCESS
-            \* if there was a previously expired grant, remove it now (the fresh grant overwrites this previously expired one)
-            /\ expired_grants' = expired_grants \ {g}
-        ELSE 
-            /\ UNCHANGED <<active_grants, expired_grants>>
-            /\ outcome_status' = GRANT_FAILED        
     /\ UNCHANGED num_execs
 
+
+\* @type: (GRANT) => Bool;
+_RevokeGrantPrecondition(g) ==
+    /\ g.grant /= g.grantee
+    /\ g \in DOMAIN active_grants
+    /\ g.sdk_message_type /= ""
 
 (*
 Revoking an existing grant `g`.
 The predicate returns False if there is no grant `g` or if granter's and grantee's address is the same.
 *)
+\* @type: (GRANT) => Bool;
 RevokeGrant(g) ==    
+    /\ 
+        \* case-split on precondition       
+        \/  \* if precondition is NOT satisfied 
+            /\ _RevokeGrantPrecondition(g)
+            /\ outcome_status' = REVOKE_FAILED
+            /\ UNCHANGED <<expired_grants, active_grants>>
+        \/ \* if precondition is satisfied
+            /\ _RevokeGrantPrecondition(g)
+            \* active grants is the same, but `g` is removed from its domain        
+            /\ active_grants' = [k \in DOMAIN active_grants \ {g} |-> active_grants[k]]
+            \* the grant `g` is removed from the set of expired grants (in case it was there)
+            /\ expired_grants' = expired_grants \ {g}
+            /\ outcome_status' = REVOKE_SUCCESS            
+
+    \* bookkeeping
     /\ action_taken' = [
         action_type |-> "revoke grant",
         grant |-> g,
@@ -97,16 +133,8 @@ RevokeGrant(g) ==
         grant_payload |-> EmptyPayload,        
         exec_message |-> EmptyMessage
         ]
-    /\        
-        IF (g.granter = g.grantee \/ g \notin DOMAIN active_grants)       
-        THEN 
-            /\ outcome_status' = REVOKE_FAILED
-            /\ UNCHANGED <<num_grants, num_execs, expired_grants, active_grants>>
-        ELSE 
-            /\ active_grants' = [k \in DOMAIN active_grants \ {g} |-> active_grants[k]]
-            /\ expired_grants' = expired_grants \ {g}
-            /\ outcome_status' = REVOKE_SUCCESS
-            /\ UNCHANGED <<num_grants, num_execs>>
+    /\ UNCHANGED <<num_execs, num_grants>>
+
     
 
 
@@ -191,6 +219,5 @@ Execute(sender, signer, msg) ==
         THEN expired_grants \ {grant}
         ELSE expired_grants
         
-
 
 =============================================================================
