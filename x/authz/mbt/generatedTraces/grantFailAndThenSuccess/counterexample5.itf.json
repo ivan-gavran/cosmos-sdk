@@ -2,7 +2,7 @@
   "#meta": {
     "format": "ITF",
     "format-description": "https://apalache.informal.systems/docs/adr/015adr-trace.html",
-    "description": "Created by Apalache on Mon Feb 21 12:04:53 CET 2022"
+    "description": "Created by Apalache on Tue Mar 08 10:23:37 CET 2022"
   },
   "vars": [
     "outcome_status",
@@ -113,13 +113,14 @@
           }
         },
         "grant": {
-          "grantee": "A",
-          "granter": "C",
+          "grantee": "B",
+          "granter": "A",
           "sdk_message_type": "msg_undelegate"
         },
         "grant_payload": {
           "allow_list": {
             "#set": [
+              "X",
               "Y",
               "Z"
             ]
@@ -127,38 +128,18 @@
           "authorization_logic": "stake",
           "deny_list": {
             "#set": [
-              
+              "X",
+              "Y",
+              "Z"
             ]
           },
-          "limit": 2,
-          "special_value": ""
+          "limit": 0,
+          "special_value": "inf"
         }
       },
       "active_grants": {
         "#map": [
-          [
-            {
-              "grantee": "A",
-              "granter": "C",
-              "sdk_message_type": "msg_undelegate"
-            },
-            {
-              "allow_list": {
-                "#set": [
-                  "Y",
-                  "Z"
-                ]
-              },
-              "authorization_logic": "stake",
-              "deny_list": {
-                "#set": [
-                  
-                ]
-              },
-              "limit": 2,
-              "special_value": ""
-            }
-          ]
+          
         ]
       },
       "expired_grants": {
@@ -168,24 +149,24 @@
       },
       "num_execs": 0,
       "num_grants": 1,
-      "outcome_status": "grant_success"
+      "outcome_status": "grant_failed"
     },
     {
       "#meta": {
         "index": 2
       },
       "action_taken": {
-        "action_type": "execute grant",
+        "action_type": "give grant",
         "exec_message": {
-          "amount": 1,
-          "message_type": "msg_undelegate",
+          "amount": -1,
+          "message_type": "",
           "new_validator": "",
-          "validator": "X"
+          "validator": ""
         },
         "exec_outcome": {
           "accept": false,
           "delete": false,
-          "description": "inappropriate_auth_stake_not_allow",
+          "description": "",
           "updated": {
             "allow_list": {
               "#set": [
@@ -203,24 +184,23 @@
           }
         },
         "grant": {
-          "grantee": "A",
-          "granter": "C",
-          "sdk_message_type": "msg_undelegate"
+          "grantee": "C",
+          "granter": "B",
+          "sdk_message_type": "msg_send"
         },
         "grant_payload": {
           "allow_list": {
             "#set": [
-              "Y",
-              "Z"
+              
             ]
           },
-          "authorization_logic": "stake",
+          "authorization_logic": "send",
           "deny_list": {
             "#set": [
               
             ]
           },
-          "limit": 2,
+          "limit": 4,
           "special_value": ""
         }
       },
@@ -228,24 +208,23 @@
         "#map": [
           [
             {
-              "grantee": "A",
-              "granter": "C",
-              "sdk_message_type": "msg_undelegate"
+              "grantee": "C",
+              "granter": "B",
+              "sdk_message_type": "msg_send"
             },
             {
               "allow_list": {
                 "#set": [
-                  "Y",
-                  "Z"
+                  
                 ]
               },
-              "authorization_logic": "stake",
+              "authorization_logic": "send",
               "deny_list": {
                 "#set": [
                   
                 ]
               },
-              "limit": 2,
+              "limit": 4,
               "special_value": ""
             }
           ]
@@ -256,9 +235,9 @@
           
         ]
       },
-      "num_execs": 1,
-      "num_grants": 1,
-      "outcome_status": "inappropriate_auth_stake_not_allow"
+      "num_execs": 0,
+      "num_grants": 2,
+      "outcome_status": "grant_success"
     }
   ]
 }
