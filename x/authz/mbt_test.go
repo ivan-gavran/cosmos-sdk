@@ -164,7 +164,7 @@ func cosmosAuthorizationFromModel(grantPayload GrantPayloadModel, msgType string
 	var authorization authz.Authorization
 	var err error
 	err = nil
-	fmt.Printf("Looking for cosmos auth from payload with limit %d and msgType %s, with authorization logic %s\n", grantPayload.Limit, msgType, grantPayload.AuthorizationLogic)
+	// fmt.Printf("Looking for cosmos auth from payload with limit %d and msgType %s, with authorization logic %s\n", grantPayload.Limit, msgType, grantPayload.AuthorizationLogic)
 	switch grantPayload.AuthorizationLogic {
 	case string(Stake):
 		{
