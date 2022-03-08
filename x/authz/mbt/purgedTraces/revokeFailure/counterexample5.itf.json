@@ -2,7 +2,7 @@
   "#meta": {
     "format": "ITF",
     "format-description": "https://apalache.informal.systems/docs/adr/015adr-trace.html",
-    "description": "Created by Apalache on Tue Mar 08 10:26:40 CET 2022"
+    "description": "Created by Apalache on Tue Mar 08 13:51:40 CET 2022"
   },
   "vars": [
     "outcome_status",
@@ -129,7 +129,7 @@
               
             ]
           },
-          "limit": 4,
+          "limit": 5,
           "special_value": ""
         }
       },
@@ -153,7 +153,7 @@
                   
                 ]
               },
-              "limit": 4,
+              "limit": 5,
               "special_value": ""
             }
           ]
@@ -201,9 +201,9 @@
           }
         },
         "grant": {
-          "grantee": "C",
-          "granter": "A",
-          "sdk_message_type": "msg_delegate"
+          "grantee": "A",
+          "granter": "B",
+          "sdk_message_type": "msg_redelegate"
         },
         "grant_payload": {
           "allow_list": {
@@ -211,13 +211,13 @@
               
             ]
           },
-          "authorization_logic": "generic",
+          "authorization_logic": "stake",
           "deny_list": {
             "#set": [
-              
+              "Z"
             ]
           },
-          "limit": -1,
+          "limit": 3,
           "special_value": ""
         }
       },
@@ -241,15 +241,15 @@
                   
                 ]
               },
-              "limit": 4,
+              "limit": 5,
               "special_value": ""
             }
           ],
           [
             {
-              "grantee": "C",
-              "granter": "A",
-              "sdk_message_type": "msg_delegate"
+              "grantee": "A",
+              "granter": "B",
+              "sdk_message_type": "msg_redelegate"
             },
             {
               "allow_list": {
@@ -257,13 +257,13 @@
                   
                 ]
               },
-              "authorization_logic": "generic",
+              "authorization_logic": "stake",
               "deny_list": {
                 "#set": [
-                  
+                  "Z"
                 ]
               },
-              "limit": -1,
+              "limit": 3,
               "special_value": ""
             }
           ]
@@ -313,22 +313,24 @@
         "grant": {
           "grantee": "B",
           "granter": "A",
-          "sdk_message_type": "msg_delegate"
+          "sdk_message_type": "msg_undelegate"
         },
         "grant_payload": {
           "allow_list": {
             "#set": [
-              
+              "X",
+              "Y",
+              "Z"
             ]
           },
-          "authorization_logic": "generic",
+          "authorization_logic": "stake",
           "deny_list": {
             "#set": [
               
             ]
           },
           "limit": -1,
-          "special_value": ""
+          "special_value": "inf"
         }
       },
       "active_grants": {
@@ -351,15 +353,15 @@
                   
                 ]
               },
-              "limit": 4,
+              "limit": 5,
               "special_value": ""
             }
           ],
           [
             {
-              "grantee": "C",
-              "granter": "A",
-              "sdk_message_type": "msg_delegate"
+              "grantee": "A",
+              "granter": "B",
+              "sdk_message_type": "msg_redelegate"
             },
             {
               "allow_list": {
@@ -367,13 +369,13 @@
                   
                 ]
               },
-              "authorization_logic": "generic",
+              "authorization_logic": "stake",
               "deny_list": {
                 "#set": [
-                  
+                  "Z"
                 ]
               },
-              "limit": -1,
+              "limit": 3,
               "special_value": ""
             }
           ],
@@ -381,22 +383,24 @@
             {
               "grantee": "B",
               "granter": "A",
-              "sdk_message_type": "msg_delegate"
+              "sdk_message_type": "msg_undelegate"
             },
             {
               "allow_list": {
                 "#set": [
-                  
+                  "X",
+                  "Y",
+                  "Z"
                 ]
               },
-              "authorization_logic": "generic",
+              "authorization_logic": "stake",
               "deny_list": {
                 "#set": [
                   
                 ]
               },
               "limit": -1,
-              "special_value": ""
+              "special_value": "inf"
             }
           ]
         ]
@@ -425,7 +429,7 @@
         "grant": {
           "grantee": "B",
           "granter": "A",
-          "sdk_message_type": "msg_delegate"
+          "sdk_message_type": "msg_undelegate"
         },
         "grant_payload": {
           "allow_list": {
@@ -463,15 +467,15 @@
                   
                 ]
               },
-              "limit": 4,
+              "limit": 5,
               "special_value": ""
             }
           ],
           [
             {
-              "grantee": "C",
-              "granter": "A",
-              "sdk_message_type": "msg_delegate"
+              "grantee": "A",
+              "granter": "B",
+              "sdk_message_type": "msg_redelegate"
             },
             {
               "allow_list": {
@@ -479,13 +483,13 @@
                   
                 ]
               },
-              "authorization_logic": "generic",
+              "authorization_logic": "stake",
               "deny_list": {
                 "#set": [
-                  
+                  "Z"
                 ]
               },
-              "limit": -1,
+              "limit": 3,
               "special_value": ""
             }
           ],
@@ -493,22 +497,24 @@
             {
               "grantee": "B",
               "granter": "A",
-              "sdk_message_type": "msg_delegate"
+              "sdk_message_type": "msg_undelegate"
             },
             {
               "allow_list": {
                 "#set": [
-                  
+                  "X",
+                  "Y",
+                  "Z"
                 ]
               },
-              "authorization_logic": "generic",
+              "authorization_logic": "stake",
               "deny_list": {
                 "#set": [
                   
                 ]
               },
               "limit": -1,
-              "special_value": ""
+              "special_value": "inf"
             }
           ]
         ]

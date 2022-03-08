@@ -25,7 +25,8 @@ _GetGrantPayload(grant, active_grants) ==
 _GrantPayloadSaneValues(grant_payload) == 
     IF grant_payload.authorization_logic /= STAKE
     THEN
-        grant_payload.special_value = ""
+        /\ grant_payload.special_value = ""
+        /\ grant_payload.limit > 0
     ELSE 
         \/ (grant_payload.special_value /= INFINITY /\ grant_payload.limit > 0)
         \/ (grant_payload.special_value = INFINITY /\ grant_payload.limit = -1)    

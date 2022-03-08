@@ -2,7 +2,7 @@
   "#meta": {
     "format": "ITF",
     "format-description": "https://apalache.informal.systems/docs/adr/015adr-trace.html",
-    "description": "Created by Apalache on Tue Mar 08 10:26:39 CET 2022"
+    "description": "Created by Apalache on Tue Mar 08 13:51:38 CET 2022"
   },
   "vars": [
     "outcome_status",
@@ -114,7 +114,7 @@
         },
         "grant": {
           "grantee": "C",
-          "granter": "B",
+          "granter": "A",
           "sdk_message_type": "msg_send"
         },
         "grant_payload": {
@@ -129,7 +129,7 @@
               
             ]
           },
-          "limit": 0,
+          "limit": 1,
           "special_value": ""
         }
       },
@@ -138,7 +138,7 @@
           [
             {
               "grantee": "C",
-              "granter": "B",
+              "granter": "A",
               "sdk_message_type": "msg_send"
             },
             {
@@ -153,7 +153,7 @@
                   
                 ]
               },
-              "limit": 0,
+              "limit": 1,
               "special_value": ""
             }
           ]
@@ -201,8 +201,8 @@
           }
         },
         "grant": {
-          "grantee": "B",
-          "granter": "A",
+          "grantee": "A",
+          "granter": "B",
           "sdk_message_type": "msg_redelegate"
         },
         "grant_payload": {
@@ -211,13 +211,13 @@
               
             ]
           },
-          "authorization_logic": "generic",
+          "authorization_logic": "stake",
           "deny_list": {
             "#set": [
-              
+              "Z"
             ]
           },
-          "limit": -1,
+          "limit": 1,
           "special_value": ""
         }
       },
@@ -226,7 +226,7 @@
           [
             {
               "grantee": "C",
-              "granter": "B",
+              "granter": "A",
               "sdk_message_type": "msg_send"
             },
             {
@@ -241,14 +241,14 @@
                   
                 ]
               },
-              "limit": 0,
+              "limit": 1,
               "special_value": ""
             }
           ],
           [
             {
-              "grantee": "B",
-              "granter": "A",
+              "grantee": "A",
+              "granter": "B",
               "sdk_message_type": "msg_redelegate"
             },
             {
@@ -257,13 +257,13 @@
                   
                 ]
               },
-              "authorization_logic": "generic",
+              "authorization_logic": "stake",
               "deny_list": {
                 "#set": [
-                  
+                  "Z"
                 ]
               },
-              "limit": -1,
+              "limit": 1,
               "special_value": ""
             }
           ]
@@ -311,24 +311,25 @@
           }
         },
         "grant": {
-          "grantee": "C",
+          "grantee": "B",
           "granter": "A",
-          "sdk_message_type": "msg_redelegate"
+          "sdk_message_type": "msg_undelegate"
         },
         "grant_payload": {
           "allow_list": {
             "#set": [
-              
+              "Y",
+              "Z"
             ]
           },
-          "authorization_logic": "generic",
+          "authorization_logic": "stake",
           "deny_list": {
             "#set": [
               
             ]
           },
           "limit": -1,
-          "special_value": ""
+          "special_value": "inf"
         }
       },
       "active_grants": {
@@ -336,7 +337,7 @@
           [
             {
               "grantee": "C",
-              "granter": "B",
+              "granter": "A",
               "sdk_message_type": "msg_send"
             },
             {
@@ -351,7 +352,29 @@
                   
                 ]
               },
-              "limit": 0,
+              "limit": 1,
+              "special_value": ""
+            }
+          ],
+          [
+            {
+              "grantee": "A",
+              "granter": "B",
+              "sdk_message_type": "msg_redelegate"
+            },
+            {
+              "allow_list": {
+                "#set": [
+                  
+                ]
+              },
+              "authorization_logic": "stake",
+              "deny_list": {
+                "#set": [
+                  "Z"
+                ]
+              },
+              "limit": 1,
               "special_value": ""
             }
           ],
@@ -359,44 +382,23 @@
             {
               "grantee": "B",
               "granter": "A",
-              "sdk_message_type": "msg_redelegate"
+              "sdk_message_type": "msg_undelegate"
             },
             {
               "allow_list": {
                 "#set": [
-                  
+                  "Y",
+                  "Z"
                 ]
               },
-              "authorization_logic": "generic",
+              "authorization_logic": "stake",
               "deny_list": {
                 "#set": [
                   
                 ]
               },
               "limit": -1,
-              "special_value": ""
-            }
-          ],
-          [
-            {
-              "grantee": "C",
-              "granter": "A",
-              "sdk_message_type": "msg_redelegate"
-            },
-            {
-              "allow_list": {
-                "#set": [
-                  
-                ]
-              },
-              "authorization_logic": "generic",
-              "deny_list": {
-                "#set": [
-                  
-                ]
-              },
-              "limit": -1,
-              "special_value": ""
+              "special_value": "inf"
             }
           ]
         ]
@@ -423,9 +425,9 @@
           "validator": ""
         },
         "grant": {
-          "grantee": "C",
-          "granter": "B",
-          "sdk_message_type": "msg_send"
+          "grantee": "B",
+          "granter": "A",
+          "sdk_message_type": "msg_undelegate"
         },
         "grant_payload": {
           "allow_list": {
@@ -448,7 +450,7 @@
           [
             {
               "grantee": "C",
-              "granter": "B",
+              "granter": "A",
               "sdk_message_type": "msg_send"
             },
             {
@@ -463,7 +465,29 @@
                   
                 ]
               },
-              "limit": 0,
+              "limit": 1,
+              "special_value": ""
+            }
+          ],
+          [
+            {
+              "grantee": "A",
+              "granter": "B",
+              "sdk_message_type": "msg_redelegate"
+            },
+            {
+              "allow_list": {
+                "#set": [
+                  
+                ]
+              },
+              "authorization_logic": "stake",
+              "deny_list": {
+                "#set": [
+                  "Z"
+                ]
+              },
+              "limit": 1,
               "special_value": ""
             }
           ],
@@ -471,44 +495,23 @@
             {
               "grantee": "B",
               "granter": "A",
-              "sdk_message_type": "msg_redelegate"
+              "sdk_message_type": "msg_undelegate"
             },
             {
               "allow_list": {
                 "#set": [
-                  
+                  "Y",
+                  "Z"
                 ]
               },
-              "authorization_logic": "generic",
+              "authorization_logic": "stake",
               "deny_list": {
                 "#set": [
                   
                 ]
               },
               "limit": -1,
-              "special_value": ""
-            }
-          ],
-          [
-            {
-              "grantee": "C",
-              "granter": "A",
-              "sdk_message_type": "msg_redelegate"
-            },
-            {
-              "allow_list": {
-                "#set": [
-                  
-                ]
-              },
-              "authorization_logic": "generic",
-              "deny_list": {
-                "#set": [
-                  
-                ]
-              },
-              "limit": -1,
-              "special_value": ""
+              "special_value": "inf"
             }
           ]
         ]

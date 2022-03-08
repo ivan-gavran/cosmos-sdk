@@ -2,7 +2,7 @@
   "#meta": {
     "format": "ITF",
     "format-description": "https://apalache.informal.systems/docs/adr/015adr-trace.html",
-    "description": "Created by Apalache on Tue Mar 08 10:23:37 CET 2022"
+    "description": "Created by Apalache on Tue Mar 08 12:55:05 CET 2022"
   },
   "vars": [
     "outcome_status",
@@ -113,7 +113,7 @@
           }
         },
         "grant": {
-          "grantee": "B",
+          "grantee": "A",
           "granter": "A",
           "sdk_message_type": "msg_undelegate"
         },
@@ -125,12 +125,10 @@
               "Z"
             ]
           },
-          "authorization_logic": "stake",
+          "authorization_logic": "send",
           "deny_list": {
             "#set": [
-              "X",
-              "Y",
-              "Z"
+              
             ]
           },
           "limit": 0,
@@ -184,9 +182,9 @@
           }
         },
         "grant": {
-          "grantee": "C",
-          "granter": "B",
-          "sdk_message_type": "msg_send"
+          "grantee": "B",
+          "granter": "C",
+          "sdk_message_type": "msg_undelegate"
         },
         "grant_payload": {
           "allow_list": {
@@ -194,10 +192,12 @@
               
             ]
           },
-          "authorization_logic": "send",
+          "authorization_logic": "stake",
           "deny_list": {
             "#set": [
-              
+              "X",
+              "Y",
+              "Z"
             ]
           },
           "limit": 4,
@@ -208,9 +208,9 @@
         "#map": [
           [
             {
-              "grantee": "C",
-              "granter": "B",
-              "sdk_message_type": "msg_send"
+              "grantee": "B",
+              "granter": "C",
+              "sdk_message_type": "msg_undelegate"
             },
             {
               "allow_list": {
@@ -218,10 +218,12 @@
                   
                 ]
               },
-              "authorization_logic": "send",
+              "authorization_logic": "stake",
               "deny_list": {
                 "#set": [
-                  
+                  "X",
+                  "Y",
+                  "Z"
                 ]
               },
               "limit": 4,

@@ -45,6 +45,7 @@ const SUCCESSFUL_AUTH_EXEC string = "successful_auth_exec"
 const INAPPROPRIATE_AUTH_STAKE_NOT_ALLOW string = "inappropriate_auth_stake_not_allow"
 const INAPPROPRIATE_AUTH_STAKE_DENY string = "inappropriate_auth_stake_deny"
 const INAPPROPRIATE_AUTH_FOR_MESSAGE string = "message_not_supported_by_the_authorization"
+const GRANT_SPENT string = "grant_spent"
 
 type ActionType string
 
@@ -159,9 +160,11 @@ func getValAddrList(names []string) []sdk.ValAddress {
 }
 
 //func cosmosUrlToModelMsg(msg_type )
-func cosmosAuthorizationFromModel(grantPayload GrantPayloadModel, msgType string, t *testing.T) authz.Authorization {
+func cosmosAuthorizationFromModel(grantPayload GrantPayloadModel, msgType string, t *testing.T) (authz.Authorization, error) {
 	var authorization authz.Authorization
-	// fmt.Printf("Looking for cosmos auth from payload with limit %d and msgType %s, with authorization logic %s\n", grantPayload.Limit, msgType, grantPayload.AuthorizationLogic)
+	var err error
+	err = nil
+	fmt.Printf("Looking for cosmos auth from payload with limit %d and msgType %s, with authorization logic %s\n", grantPayload.Limit, msgType, grantPayload.AuthorizationLogic)
 	switch grantPayload.AuthorizationLogic {
 	case string(Stake):
 		{
@@ -188,16 +191,17 @@ func cosmosAuthorizationFromModel(grantPayload GrantPayloadModel, msgType string
 				limit := sdk.NewInt64Coin(sdk.DefaultBondDenom, int64(grantPayload.Limit))
 				limitAddr = &limit
 			}
-			var err error
+
 			authorization, err = stakingtypes.NewStakeAuthorization(
 				allowList,
 				denyList,
 				stakingAuthorizationType,
 				limitAddr)
-			// IG: is there a benefit in adding these low-level checks?
-			require.NoError(t, err)
+
 			authorizationMsgTypeURL := modelMsgToCosmosURL[msgType]
-			require.Equal(t, authorization.MsgTypeURL(), authorizationMsgTypeURL)
+			if err == nil {
+				require.Equal(t, authorization.MsgTypeURL(), authorizationMsgTypeURL)
+			}
 
 		}
 	case string(Send):
@@ -216,15 +220,23 @@ func cosmosAuthorizationFromModel(grantPayload GrantPayloadModel, msgType string
 
 	}
 	// fmt.Printf("Returning the authorization %s\n", authorization)
-	return authorization
+	return authorization, err
 
 }
 
 func giveSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
 	grantPayload := actionTaken.GrantPayload
-	authorization := cosmosAuthorizationFromModel(grantPayload, actionTaken.Grant.SdkMessageType, t)
-
-	require.NoError(t, authorization.ValidateBasic())
+	authorization, authzErr := cosmosAuthorizationFromModel(grantPayload, actionTaken.Grant.SdkMessageType, t)
+	if !(authzErr == nil) {
+		require.Equal(t, outcome, GRANT_FAILED)
+		return
+	}
+	if outcome == GRANT_SUCCESS {
+		fmt.Printf("limit is %d\n", grantPayload.Limit)
+		fmt.Printf("authorization is: ")
+		require.NotNil(t, authorization)
+		require.NoError(t, authorization.ValidateBasic())
+	}
 
 	granterAddr := accountNameToAddress[actionTaken.Grant.Granter]
 	granteeAddr := accountNameToAddress[actionTaken.Grant.Grantee]
@@ -232,7 +244,9 @@ func giveSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
 	require.NotNil(t, now)
 	err := app.AuthzKeeper.SaveGrant(ctx, granteeAddr, granterAddr, authorization, now.Add(time.Hour))
 	require.NoError(t, err)
-	msgAuthorizationType := authorization.MsgTypeURL()
+
+	// msgAuthorizationType := authorization.MsgTypeURL()
+	msgAuthorizationType := modelMsgToCosmosURL[actionTaken.Grant.SdkMessageType]
 
 	storedAuthz, _ := app.AuthzKeeper.GetCleanAuthorization(ctx, granteeAddr, granterAddr, msgAuthorizationType)
 	// fmt.Printf("Just stored the authorization %s, for granter %s and grantee %s\n", storedAuthz, granterAddr, granteeAddr)
@@ -253,6 +267,8 @@ func revokeSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T)
 	granteeAddr := accountNameToAddress[actionTaken.Grant.Grantee]
 	authorizationType := modelMsgToCosmosURL[actionTaken.Grant.SdkMessageType]
 
+	authorizationOld, _ := app.AuthzKeeper.GetCleanAuthorization(ctx, granteeAddr, granterAddr, authorizationType)
+
 	err := app.AuthzKeeper.DeleteGrant(ctx, granteeAddr, granterAddr, authorizationType)
 	require.NoError(t, err)
 
@@ -260,7 +276,7 @@ func revokeSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T)
 	if outcome == REVOKE_SUCCESS {
 		require.Nil(t, authorization)
 	} else if outcome == REVOKE_FAILED {
-		require.NotNil(t, authorization)
+		require.Equal(t, authorization, authorizationOld)
 	} else {
 		require.True(t, false)
 	}
@@ -296,7 +312,7 @@ func executeSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T
 		require.Nil(t, storedAuthz)
 		return
 	}
-	authorization := cosmosAuthorizationFromModel(grantPayload, actionTaken.Grant.SdkMessageType, t)
+	authorization, _ := cosmosAuthorizationFromModel(grantPayload, actionTaken.Grant.SdkMessageType, t)
 	require.Equal(t, authorization, storedAuthz)
 
 	switch actionTaken.ExecMessage.Message_Type {
@@ -331,12 +347,17 @@ func executeSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T
 		require.NoError(t, err)
 		require.Equal(t, actionTaken.ExecOutcome.Accept, resp.Accept)
 		require.Equal(t, actionTaken.ExecOutcome.Delete, resp.Delete)
-		updatedGrant := cosmosAuthorizationFromModel(actionTaken.ExecOutcome.Updated, actionTaken.Grant.SdkMessageType, t)
+		updatedGrant, _ := cosmosAuthorizationFromModel(actionTaken.ExecOutcome.Updated, actionTaken.Grant.SdkMessageType, t)
 		if grantPayload.AuthorizationLogic == string(Generic) {
 			require.Nil(t, resp.Updated)
 		} else {
 			require.Equal(t, updatedGrant, resp.Updated)
 		}
+	} else if outcome == GRANT_SPENT {
+		require.NoError(t, err)
+		require.Equal(t, actionTaken.ExecOutcome.Accept, resp.Accept)
+		require.Equal(t, actionTaken.ExecOutcome.Delete, resp.Delete)
+		require.Nil(t, resp.Updated)
 	} else {
 		require.Error(t, err)
 	}
@@ -422,7 +443,7 @@ func testEnvironmentSetup(t *testing.T) {
 
 */
 func TestExecuteItfJson(t *testing.T) {
-	testEnvironmentSetup(t)
+
 	umbrellaDir := "mbt/generatedTraces/"
 	testDirs, err := os.ReadDir(umbrellaDir)
 	if err != nil {
@@ -450,6 +471,10 @@ func TestExecuteItfJson(t *testing.T) {
 				byteValue, _ := ioutil.ReadAll(traceFile)
 				var jsonData TraceJsonStruct
 				json.Unmarshal(byteValue, &jsonData)
+
+				// setup the testing environment
+				testEnvironmentSetup(t)
+
 				for _, state := range jsonData.States {
 					executeAppropriateAction(state, t)
 				}
