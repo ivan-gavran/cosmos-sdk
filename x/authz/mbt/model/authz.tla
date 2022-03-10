@@ -101,7 +101,7 @@ GiveGrant(g, g_payload) ==
 
 \* @type: (GRANT) => Bool;
 _RevokeGrantPrecondition(g) ==
-    /\ g.grant /= g.grantee
+    /\ g.granter /= g.grantee
     /\ g \in DOMAIN active_grants
     /\ g.sdk_message_type /= ""
 
