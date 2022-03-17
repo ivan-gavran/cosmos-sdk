@@ -2,7 +2,8 @@
 
 EXTENDS 
     statusCodes, 
-    Integers
+    Integers,
+    FiniteSets
 
 
 \* @type: (GRANT_PAYLOAD, MESSAGE) => GRANT_PAYLOAD;
@@ -38,9 +39,9 @@ _IsGrantAppropriateStake(g_payload, msg) ==
     IN 
     IF g_payload.limit < msg.amount /\ g_payload.special_value /= INFINITY
     THEN INSUFFICIENT_GRANT_EXEC
-    ELSE IF validator_to_check \in g_payload.deny_list
+    ELSE IF Cardinality(g_payload.allow_list) = 0 /\ validator_to_check \in g_payload.deny_list
     THEN INAPPROPRIATE_AUTH_STAKE_DENY
-    ELSE IF validator_to_check \notin g_payload.allow_list
+    ELSE IF Cardinality(g_payload.deny_list) = 0 /\ validator_to_check \notin g_payload.allow_list
     THEN INAPPROPRIATE_AUTH_STAKE_NOT_ALLOW    
     ELSE APPROPRIATE
     

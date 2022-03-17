@@ -29,5 +29,11 @@ InappropriateAuthWrongStakingAction ==
 InappropriateAuthWrongStakingActionCEX == ~ InappropriateAuthWrongStakingAction
 (* ---> *)
 
+SuccessfulExecWithDeny ==
+    /\ outcome_status = SUCCESSFUL_AUTH_EXEC
+    /\ num_grants > 2
+    /\ Cardinality(action_taken.grant_payload.deny_list) > 0
+
+SuccessfulExecWithDenyCEX == ~ SuccessfulExecWithDeny
 
 ====
