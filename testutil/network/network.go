@@ -39,6 +39,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/simapp"
 	"github.com/cosmos/cosmos-sdk/simapp/params"
 	storetypes "github.com/cosmos/cosmos-sdk/store/types"
+	"github.com/cosmos/cosmos-sdk/testutil"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
@@ -80,6 +81,7 @@ type Config struct {
 	TimeoutCommit    time.Duration              // the consensus commitment timeout
 	ChainID          string                     // the network chain-id
 	NumValidators    int                        // the total number of validators to create and bond
+	Mnemonics        []string                   // custom user-provided validator operator mnemonics
 	BondDenom        string                     // the staking bond denomination
 	MinGasPrices     string                     // the minimum gas prices each validator will accept
 	AccountTokens    sdk.Int                    // the amount of unique validator tokens (e.g. 1000node0)
@@ -114,9 +116,9 @@ func DefaultConfig() Config {
 		NumValidators:     4,
 		BondDenom:         sdk.DefaultBondDenom,
 		MinGasPrices:      fmt.Sprintf("0.000006%s", sdk.DefaultBondDenom),
-		AccountTokens:     sdk.TokensFromConsensusPower(1000, sdk.DefaultPowerReduction),
-		StakingTokens:     sdk.TokensFromConsensusPower(500, sdk.DefaultPowerReduction),
-		BondedTokens:      sdk.TokensFromConsensusPower(100, sdk.DefaultPowerReduction),
+		AccountTokens:     sdk.NewIntFromUint64(1000_000_000),
+		StakingTokens:     sdk.NewIntFromUint64(500_000_000),
+		BondedTokens:      sdk.NewIntFromUint64(100_000_000),
 		PruningStrategy:   storetypes.PruningOptionNothing,
 		CleanupDir:        true,
 		SigningAlgo:       string(hd.Secp256k1Type),
@@ -327,6 +329,7 @@ func New(l Logger, baseDir string, cfg Config) (*Network, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		tmCfg.P2P.ListenAddress = p2pAddr
 		tmCfg.P2P.AddrBookStrict = false
 		tmCfg.P2P.AllowDuplicateIP = true
@@ -335,6 +338,7 @@ func New(l Logger, baseDir string, cfg Config) (*Network, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		nodeIDs[i] = nodeID
 		valPubKeys[i] = pubKey
 
@@ -349,7 +353,12 @@ func New(l Logger, baseDir string, cfg Config) (*Network, error) {
 			return nil, err
 		}
 
-		addr, secret, err := server.GenerateSaveCoinKey(kb, nodeDirName, true, algo)
+		var mnemonic string
+		if i < len(cfg.Mnemonics) {
+			mnemonic = cfg.Mnemonics[i]
+		}
+
+		addr, secret, err := testutil.GenerateSaveCoinKey(kb, nodeDirName, mnemonic, true, algo)
 		if err != nil {
 			return nil, err
 		}
@@ -593,6 +602,10 @@ func (n *Network) Cleanup() {
 			}
 		}
 	}
+
+	// Give a brief pause for things to finish closing in other processes. Hopefully this helps with the address-in-use errors.
+	// 100ms chosen randomly.
+	time.Sleep(100 * time.Millisecond)
 
 	if n.Config.CleanupDir {
 		_ = os.RemoveAll(n.BaseDir)

@@ -26,6 +26,7 @@ import (
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/server"
 	srvconfig "github.com/cosmos/cosmos-sdk/server/config"
+	"github.com/cosmos/cosmos-sdk/testutil"
 	"github.com/cosmos/cosmos-sdk/testutil/network"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
@@ -263,7 +264,7 @@ func initTestnetFiles(
 			return err
 		}
 
-		addr, secret, err := server.GenerateSaveCoinKey(kb, nodeDirName, true, algo)
+		addr, secret, err := testutil.GenerateSaveCoinKey(kb, nodeDirName, "", true, algo)
 		if err != nil {
 			_ = os.RemoveAll(args.outputDir)
 			return err
@@ -281,8 +282,8 @@ func initTestnetFiles(
 			return err
 		}
 
-		accTokens := sdk.TokensFromConsensusPower(1000, sdk.DefaultPowerReduction)
-		accStakingTokens := sdk.TokensFromConsensusPower(500, sdk.DefaultPowerReduction)
+		accTokens := sdk.NewIntFromUint64(1000_000_000)
+		accStakingTokens := sdk.NewIntFromUint64(500_000_000)
 		coins := sdk.Coins{
 			sdk.NewCoin("testtoken", accTokens),
 			sdk.NewCoin(sdk.DefaultBondDenom, accStakingTokens),
@@ -291,7 +292,7 @@ func initTestnetFiles(
 		genBalances = append(genBalances, banktypes.Balance{Address: addr.String(), Coins: coins.Sort()})
 		genAccounts = append(genAccounts, authtypes.NewBaseAccount(addr, nil, 0, 0))
 
-		valTokens := sdk.TokensFromConsensusPower(100, sdk.DefaultPowerReduction)
+		valTokens := sdk.NewIntFromUint64(100_000_000)
 		createValMsg, err := stakingtypes.NewMsgCreateValidator(
 			sdk.ValAddress(addr),
 			valPubKeys[i],

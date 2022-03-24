@@ -1,6 +1,8 @@
 package types_test
 
 import (
+	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/codec/legacy"
 	"math/rand"
 	"sort"
 	"testing"
@@ -8,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/staking/types"
 )
 
@@ -27,16 +28,16 @@ func createValidators(t *testing.T) []types.Validator {
 
 func TestHistoricalInfo(t *testing.T) {
 	validators := createValidators(t)
-	hi := types.NewHistoricalInfo(header, validators, sdk.DefaultPowerReduction)
+	hi := types.NewHistoricalInfo(header, validators, types.DefaultConfig().PowerReduction)
 	require.True(t, sort.IsSorted(types.Validators(hi.Valset)), "Validators are not sorted")
 
 	var value []byte
 	require.NotPanics(t, func() {
-		value = types.ModuleCdc.MustMarshal(&hi)
+		value = legacy.Cdc.MustMarshal(&hi)
 	})
 	require.NotNil(t, value, "Marshalled HistoricalInfo is nil")
 
-	recv, err := types.UnmarshalHistoricalInfo(types.ModuleCdc, value)
+	recv, err := types.UnmarshalHistoricalInfo(codec.NewAminoCodec(legacy.Cdc), value)
 	require.Nil(t, err, "Unmarshalling HistoricalInfo failed")
 	require.Equal(t, hi.Header, recv.Header)
 	for i := range hi.Valset {
@@ -68,7 +69,7 @@ func TestValidateBasic(t *testing.T) {
 	err = types.ValidateBasic(hi)
 	require.Error(t, err, "ValidateBasic passed on unsorted ValSet")
 
-	hi = types.NewHistoricalInfo(header, validators, sdk.DefaultPowerReduction)
+	hi = types.NewHistoricalInfo(header, validators, types.DefaultConfig().PowerReduction)
 	err = types.ValidateBasic(hi)
 	require.NoError(t, err, "ValidateBasic failed on valid HistoricalInfo")
 }
