@@ -114,7 +114,7 @@ RevokeGrant(g) ==
     /\ 
         \* case-split on precondition       
         \/  \* if precondition is NOT satisfied 
-            /\ _RevokeGrantPrecondition(g)
+            /\ ~ _RevokeGrantPrecondition(g)
             /\ outcome_status' = REVOKE_FAILED
             /\ UNCHANGED <<expired_grants, active_grants>>
         \/ \* if precondition is satisfied

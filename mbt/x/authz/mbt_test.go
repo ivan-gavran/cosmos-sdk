@@ -2,12 +2,13 @@ package mbt
 
 import (
 	"encoding/json"
-	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/simapp"
@@ -248,6 +249,9 @@ func giveSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
 
 	msgAuthorizationType := modelMsgToCosmosURL[actionTaken.Grant.SdkMessageType]
 
+	log.WithFields(log.Fields{
+		"msgAuthorizationType": msgAuthorizationType,
+	}).Debug("asking for clean authorization")
 	storedAuthz, _ := app.AuthzKeeper.GetCleanAuthorization(ctx, granteeAddr, granterAddr, msgAuthorizationType)
 
 	if outcome == GRANT_SUCCESS {
@@ -267,8 +271,21 @@ func revokeSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T)
 
 	authorizationOld, _ := app.AuthzKeeper.GetCleanAuthorization(ctx, granteeAddr, granterAddr, authorizationType)
 
+	log.WithFields(
+		log.Fields{
+			"granter":            granterAddr,
+			"grantee":            granteeAddr,
+			"authorization type": authorizationType,
+		}).Debug("revoking authorization")
 	err := app.AuthzKeeper.DeleteGrant(ctx, granteeAddr, granterAddr, authorizationType)
-	require.NoError(t, err)
+
+	if outcome == REVOKE_FAILED {
+		require.Error(t, err)
+	} else if outcome == REVOKE_SUCCESS {
+		require.NoError(t, err)
+	} else {
+		require.True(t, false)
+	}
 
 	authorization, _ := app.AuthzKeeper.GetCleanAuthorization(ctx, granteeAddr, granterAddr, authorizationType)
 	if outcome == REVOKE_SUCCESS {
@@ -448,6 +465,7 @@ func TestExecuteItfJson(t *testing.T) {
 	// log.SetLevel(log.DebugLevel)
 
 	umbrellaDir := "traces"
+	// umbrellaDir := "purgedTraces"
 	testDirs, err := os.ReadDir(umbrellaDir)
 	if err != nil {
 
