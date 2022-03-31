@@ -244,6 +244,16 @@ func giveSpecifiedGrant(actionTaken ActionModel, outcome string, t *testing.T) {
 	granteeAddr := accountNameToAddress[actionTaken.Grant.Grantee]
 	now := ctx.BlockHeader().Time
 	require.NotNil(t, now)
+
+	// this is a special case check: it is due to the fact that a message
+	// with granter == grantee will fail to be processed already in the authz/msgs.go
+	// (thus, there will be no check upon calling the SaveGrant function)
+	// Perhaps one solution would be to change the level of this driver's implementation
+	// as discussed in issue https://github.com/informalsystems/mbt/issues/142
+	if actionTaken.Grant.Granter == actionTaken.Grant.Grantee {
+		require.Equal(t, outcome, GRANT_FAILED)
+		return
+	}
 	err := app.AuthzKeeper.SaveGrant(ctx, granteeAddr, granterAddr, authorization, now.Add(time.Hour))
 	require.NoError(t, err)
 
